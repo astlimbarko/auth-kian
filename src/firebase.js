@@ -10,13 +10,13 @@ import logger from './utils/logger';
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyD_CX-Ymm4Allhrv1ogo8yXmg62b6eOS4g",
-  authDomain: "calculadora-kian.firebaseapp.com",
-  projectId: "calculadora-kian",
-  storageBucket: "calculadora-kian.firebasestorage.app",
-  messagingSenderId: "968798950382",
-  appId: "1:968798950382:web:02a84e87172f0a51aff4ff",
-  measurementId: "G-9LDW9T40XY"
+  apiKey: "AIzaSyAmzn4bCs0uLaC7siqJeLclBZvpBVFOgoY",
+  authDomain: "envios-kian.firebaseapp.com",
+  projectId: "envios-kian",
+  storageBucket: "envios-kian.firebasestorage.app",
+  messagingSenderId: "1087472686228",
+  appId: "1:1087472686228:web:de9213d01012f29e6cd081",
+  measurementId: "G-P8TBPYNPJS"
 };
 
 // Initialize Firebase

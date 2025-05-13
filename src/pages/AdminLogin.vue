@@ -104,6 +104,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { iniciarSesionConEmailYPassword } from '../services/authService';
+import wallpiImage from '../assets/wallpi.jpg';
 
 // Cargar la fuente de manera programática para evitar problemas CORS
 onMounted(() => {
@@ -111,39 +112,27 @@ onMounted(() => {
   const fontLink = document.createElement('link');
   fontLink.href = 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap';
   fontLink.rel = 'stylesheet';
-  fontLink.crossOrigin = 'anonymous'; // Añadir atributo crossorigin
+  fontLink.crossOrigin = 'anonymous';
   document.head.appendChild(fontLink);
 
-  // Aplicar el degradado al fondo de forma directa
-  const customCSS = `
-    body, html {
-      background: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
-      background-color: transparent !important;
-      background-image: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      min-height: 100vh !important;
-      min-width: 100vw !important;
-      overflow-x: hidden !important;
-    }
-  `;
-  
-  const styleElement = document.createElement('style');
-  styleElement.setAttribute('id', 'login-gradient-style');
-  styleElement.textContent = customCSS;
-  document.head.appendChild(styleElement);
+  // Aplicar la imagen de fondo
+  document.body.style.backgroundImage = `url(${wallpiImage})`;
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundRepeat = 'no-repeat';
+  document.body.style.backgroundAttachment = 'fixed';
+  document.body.style.margin = '0';
+  document.body.style.padding = '0';
+  document.body.style.minHeight = '100vh';
 });
 
-// Revertir el color de fondo cuando se abandone la página
+// Limpiar estilos al desmontar
 onUnmounted(() => {
-  // Eliminar el estilo personalizado
-  const styleElement = document.getElementById('login-gradient-style');
-  if (styleElement) {
-    styleElement.remove();
-  }
-  
-  document.body.style.background = 'white';
-  document.documentElement.style.background = 'white';
+  document.body.style.backgroundImage = '';
+  document.body.style.backgroundSize = '';
+  document.body.style.backgroundPosition = '';
+  document.body.style.backgroundRepeat = '';
+  document.body.style.backgroundAttachment = '';
 });
 
 const email = ref('');
@@ -226,21 +215,16 @@ const iniciarSesion = async () => {
   box-sizing: border-box;
 }
 
+/* Asegurar que el contenedor principal ocupe toda la pantalla */
 .login-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa, #e9edf2);
+  width: 100vw;
+  position: relative;
   font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-:deep(body), :deep(html) {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
 }
 
 .login-box {
@@ -248,12 +232,11 @@ const iniciarSesion = async () => {
   max-width: 400px;
   padding: 2rem;
   border-radius: 12px;
-  background-color: white;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  text-align: center;
-  border: 1px solid var(--input-border);
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   position: relative;
-  overflow: hidden;
+  z-index: 1;
 }
 
 .header {
@@ -465,34 +448,6 @@ input:focus {
   .header {
     font-size: 1.25rem;
   }
-}
-
-/* Específicamente para esta página, asegurar que el fondo sea el gradiente */
-::v-deep() {
-  body {
-    background: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 100vh !important;
-  }
-  
-  html {
-    background: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 100vh !important;
-  }
-}
-
-/* Estilo adicional con alta especificidad para el body */
-:deep(#app) body,
-:deep(html) body,
-:deep(body) {
-  background: linear-gradient(135deg, #f5f7fa, #e9edf2) !important;
-  background-color: transparent !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 100vh !important;
 }
 
 .remember-me {
