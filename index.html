@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es" prefix="og: http://ogp.me/ns#">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/div.ico" />
+    <!-- Configuración del viewport para iOS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- Metadatos para SEO y compartir en redes sociales -->
+    <title>Panel de Administración KIAN</title>
+    <meta name="description" content="Panel de administración para Envíos KIAN" />
+    
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://calculadora-kian.web.app/" />
+    <meta property="og:title" content="Panel de Administración KIAN" />
+    <meta property="og:description" content="Panel de administración para Envíos KIAN" />
+    <meta property="og:image" content="https://calculadora-kian.web.app/logo-kian.jpg" />
+    <meta property="og:image:secure_url" content="https://calculadora-kian.web.app/logo-kian.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="KIAN Envíos" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://calculadora-kian.web.app/" />
+    <meta name="twitter:title" content="Panel de Administración KIAN" />
+    <meta name="twitter:description" content="Panel de administración para Envíos KIAN" />
+    
+    <!-- Política de cookies -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    
+    <!-- Preconectar con Google Fonts para mejorar rendimiento -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Cargar Material Icons con atributo crossorigin -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" crossorigin="anonymous">
+    
+    <!-- Precargar fuentes Poppins -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    
+    <!-- Estilos inline para evitar FOUC (Flash of Unstyled Content) -->
+    <style>
+      /* Estilos fallback mientras se cargan las fuentes */
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      /* Evitar conflictos CORS con SVG */
+      svg {
+        max-width: 100%;
+        max-height: 100%;
+      }
+    </style>
+    
+    <!-- Script para manejar Firebase Auth sin depender de cookies de terceros -->
+    <script>
+      // Configuración optimizada para evitar problemas con políticas modernas de cookies
+      window.firebaseAuthOptions = {
+        // Usar persistencia local para almacenar tokens de autenticación en el almacenamiento local
+        // en lugar de depender de cookies
+        persistenceType: 'LOCAL',
+        
+        // Verificar que estamos en un contexto seguro (HTTPS)
+        requireSecureContext: true,
+        
+        // Opciones adicionales para mejorar compatibilidad
+        authOptions: {
+          // Utilizar el enfoque indexedDB primero, con fallback a localStorage
+          indexedDBFallback: true
+        }
+      };
+
+      // Manejar proactivamente posibles errores de conexión
+      window.addEventListener('unhandledrejection', function(event) {
+        // Capturar errores de promesas no manejadas
+        if (event.reason && event.reason.message && 
+            event.reason.message.includes('Could not establish connection')) {
+          // Error de conexión silenciado para mejorar la experiencia del usuario
+          event.preventDefault(); // Prevenir que llegue a la consola
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
