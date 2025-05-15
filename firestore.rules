@@ -1,12 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regla para la colección de configuración
+    // Regla específica para el documento de precios
+    match /configuracion/precios {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Regla para el resto de documentos en configuracion
     match /configuracion/{document=**} {
       allow read, write: if request.auth != null;
     }
     
-    // Regla para el resto de colecciones
+    // Denegar todo lo demás por defecto
     match /{document=**} {
       allow read, write: if false;
     }

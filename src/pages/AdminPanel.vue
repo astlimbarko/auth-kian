@@ -16,9 +16,10 @@
         <div class="loading-text">Cargando configuración de precios...</div>
       </div>
 
-      <div v-else-if="!precioEstandarActual || !precioEspecialActual" class="error-overlay">
+      <!-- Mensaje de error solo si hubo un error al cargar -->
+      <div v-else-if="errorCarga" class="error-overlay">
         <div class="error-icon">⚠️</div>
-        <div class="error-message">No se pudieron cargar los precios. Por favor, verifica tu conexión y recarga la página.</div>
+        <div class="error-message">{{ mensajeError || 'No se pudieron cargar los precios. Por favor, verifica tu conexión y recarga la página.' }}</div>
       </div>
 
       <!-- Tarjeta principal (visible solo cuando los precios están cargados) -->
@@ -45,7 +46,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { actualizarTasasCambio, PRECIO_ESTANDAR, PRECIO_ESPECIAL } from '../constants/precios.js';
 import { obtenerPrecios } from '../services/preciosService';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cerrarSesion as logoutAuth } from '../services/authService';
 
@@ -69,6 +70,8 @@ const precioEspecialStr = computed(() => {
 });
 const guardando = ref(false);
 const cargando = ref(true);
+const errorCarga = ref(false);
+const mensajeError = ref('');
 
 // Referencia a la notificación
 const notificacion = ref(null);
@@ -82,7 +85,10 @@ const mostrarError = (mensaje) => {
 // Manejador del evento de precios actualizados
 const manejarPreciosActualizados = (evento) => {
   console.log('Precios actualizados:', evento.detail);
-  notificacion.value?.mostrarExito('Priserna har uppdaterats');
+  // No mostrar notificación durante la carga inicial
+  if (!cargando.value) {
+    notificacion.value?.mostrarExito('Priserna har uppdaterats');
+  }
 };
 
 // Manejador del evento de error
@@ -102,20 +108,25 @@ onMounted(async () => {
     return;
   }
   
-  try {
-    // Cargar precios actuales desde Firebase
-    await cargarPrecios();
-    
-    // Agregar escuchadores de eventos
-    window.addEventListener('precios-actualizados', manejarPreciosActualizados);
-    window.addEventListener('precios-error', manejarPreciosError);
-    
-    // Escuchar cambios en tiempo real
-    iniciarEscuchaRealtime();
-  } catch (error) {
-    console.error('Error crítico al cargar el panel de administración:', error);
-    mostrarError('No se pudo cargar la configuración de precios. Por favor, recarga la página.');
-  }
+    try {
+      // Cargar precios actuales desde Firebase
+      await cargarPrecios();
+      
+      // Si llegamos aquí, la carga fue exitosa
+      errorCarga.value = false;
+      
+      // Agregar escuchadores de eventos
+      window.addEventListener('precios-actualizados', manejarPreciosActualizados);
+      window.addEventListener('precios-error', manejarPreciosError);
+      
+      // Escuchar cambios en tiempo real
+      iniciarEscuchaRealtime();
+    } catch (error) {
+      console.error('Error crítico al cargar el panel de administración:', error);
+      errorCarga.value = true;
+      mensajeError.value = error.message || 'No se pudo cargar la configuración de precios. Por favor, recarga la página.';
+      mostrarError(mensajeError.value);
+    }
 });
 
 // Limpiar escuchadores al desmontar
@@ -124,10 +135,64 @@ onUnmounted(() => {
   window.removeEventListener('precios-error', manejarPreciosError);
 });
 
+// Escuchar cambios en tiempo real de los precios
+const iniciarEscuchaRealtime = () => {
+  try {
+    console.log('Iniciando escucha en tiempo real de precios...');
+    const docRef = doc(db, 'configuracion', 'precios');
+    
+    // Bandera para ignorar la primera carga
+    let esPrimeraCarga = true;
+    
+    // Escuchar cambios en el documento
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log('Cambio detectado en Firestore:', data);
+        
+        // Actualizar los valores reactivos
+        if (typeof data.precioEstandar === 'number' && !isNaN(data.precioEstandar)) {
+          PRECIO_ESTANDAR.value = data.precioEstandar;
+        }
+        if (typeof data.precioEspecial === 'number' && !isNaN(data.precioEspecial)) {
+          PRECIO_ESPECIAL.value = data.precioEspecial;
+        }
+        
+        console.log('Precios actualizados en tiempo real:');
+        console.log('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
+        console.log('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
+        
+        // No disparar evento en la primera carga
+        if (!esPrimeraCarga) {
+          // Disparar evento personalizado para notificar a otros componentes
+          window.dispatchEvent(new CustomEvent('precios-actualizados', {
+            detail: {
+              precioEstandar: PRECIO_ESTANDAR.value,
+              precioEspecial: PRECIO_ESPECIAL.value
+            }
+          }));
+        }
+        
+        // Marcar que ya pasó la primera carga
+        esPrimeraCarga = false;
+      }
+    }, (error) => {
+      console.error('Error en la escucha en tiempo real:', error);
+      window.dispatchEvent(new CustomEvent('precios-error', {
+        detail: { error }
+      }));
+    });
+  } catch (error) {
+    console.error('Error al iniciar la escucha en tiempo real:', error);
+    throw error;
+  }
+};
+
 // Cargar los precios actuales
 const cargarPrecios = async () => {
   try {
     cargando.value = true;
+    errorCarga.value = false;
     console.log('Cargando precios desde Firebase...');
     
     const preciosActuales = await obtenerPrecios();
