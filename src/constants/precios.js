@@ -30,25 +30,33 @@ let unsubscribeListener = null;
 const cargarPrecios = async () => {
   try {
     cargando.value = true;
-    logger.debug('Valores iniciales antes de cargar:');
-    logger.debug('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
-    logger.debug('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
+    logger.debug('Iniciando carga de precios desde Firebase...');
     
     const precios = await obtenerPrecios();
+    
+    if (!precios) {
+      throw new Error('No se recibieron datos de precios');
+    }
+    
     logger.debug('Precios obtenidos de Firebase:', precios);
+    
+    // Validar que los precios sean números válidos
+    if (typeof precios.precioEstandar !== 'number' || isNaN(precios.precioEstandar) ||
+        typeof precios.precioEspecial !== 'number' || isNaN(precios.precioEspecial)) {
+      throw new Error('Los precios obtenidos no son válidos');
+    }
     
     // Actualizar valores
     PRECIO_ESTANDAR.value = precios.precioEstandar;
     PRECIO_ESPECIAL.value = precios.precioEspecial;
-    UMBRAL_BOB_PRECIO_ESPECIAL.value = precios.umbralEspecial;
+    UMBRAL_BOB_PRECIO_ESPECIAL.value = precios.umbralEspecial || 5000;
     
-    // Mostrar valores actualizados
-    logger.debug('Valores después de cargar:');
+    logger.debug('Valores actualizados correctamente:');
     logger.debug('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
     logger.debug('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
     
     preciosCargados.value = true;
-    logger.debug('Precios cargados desde Firebase:', precios);
+    logger.debug('Precios cargados exitosamente desde Firebase');
     
     // Notificar a otros componentes la actualización
     const evento = new CustomEvent('precios-cargados', { 
@@ -65,13 +73,24 @@ const cargarPrecios = async () => {
     // Iniciar escucha en tiempo real si aún no está activa
     iniciarEscuchaRealtime();
   } catch (error) {
-    logger.error('Error al cargar precios:', error);
+    logger.error('Error crítico al cargar precios:', error);
     
-    // Notificar error
-    const evento = new CustomEvent('precios-error', { 
-      detail: { error: error.message }
+    // No usamos valores por defecto, dejamos los valores como null
+    PRECIO_ESTANDAR.value = null;
+    PRECIO_ESPECIAL.value = null;
+    
+    // Disparar evento de error con detalles
+    const errorEvent = new CustomEvent('precios-error', { 
+      detail: { 
+        error: {
+          message: 'No se pudieron cargar los precios. Por favor, verifica tu conexión e inténtalo de nuevo.',
+          originalError: error
+        }
+      } 
     });
-    window.dispatchEvent(evento);
+    
+    window.dispatchEvent(errorEvent);
+    throw error; // Propagar el error para que se pueda manejar en la UI
   } finally {
     cargando.value = false;
   }
@@ -162,7 +181,12 @@ async function actualizarTasasCambio(estandar, especial) {
   
   try {
     // Guardar en Firebase
-    logger.debug('Intentando guardar en Firebase...');
+    // No usamos valores por defecto, forzamos a que se obtengan de Firestore
+    const DEFAULTS = {
+      precioEstandar: null,
+      precioEspecial: null,
+      umbralEspecial: 5000
+    };
     const resultado = await guardarPrecios(estandar, especial);
     logger.debug('Resultado de Firebase:', resultado);
     

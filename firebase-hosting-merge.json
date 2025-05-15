@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "login-kian",
+    "target": "login-kian",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -35,9 +35,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
   }
 }

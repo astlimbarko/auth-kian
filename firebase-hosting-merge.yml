@@ -1,0 +1,20 @@
+target: login-kian
+public: dist
+ignore:
+  - firebase.json
+  - **/.*
+  - **/node_modules/**
+cleanUrls: true
+trailingSlash: false
+headers:
+  - source: /**/*.@(js|css|jpg|jpeg|png|gif|ico|svg)
+    headers:
+      - key: Cache-Control
+        value: max-age=3600
+  - source: /**/*.@(html|htm)
+    headers:
+      - key: Cache-Control
+        value: no-cache, no-store, must-revalidate
+rewrites:
+  - source: **
+    destination: /index.html

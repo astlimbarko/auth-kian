@@ -20,7 +20,19 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+console.log('Inicializando Firebase con la siguiente configuración:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain
+});
+
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase inicializado correctamente');
+} catch (error) {
+  console.error('Error al inicializar Firebase:', error);
+  throw error;
+}
 
 // Inicialización segura de Analytics con manejo de errores
 let analytics = null;
@@ -36,8 +48,35 @@ isSupported()
     logger.error('Error al verificar compatibilidad con Analytics:', error);
   });
 
+console.log('Inicializando Firestore...');
 const db = getFirestore(app);
+console.log('Firestore inicializado');
+
+console.log('Inicializando Auth...');
 const auth = getAuth(app);
+console.log('Auth inicializado');
+
+// Verificar conexión a Firestore
+const checkFirestoreConnection = async () => {
+  try {
+    console.log('Verificando conexión a Firestore...');
+    const docRef = doc(db, 'configuracion', 'precios');
+    const docSnap = await getDoc(docRef);
+    console.log('Conexión a Firestore exitosa');
+    if (docSnap.exists()) {
+      console.log('Documento encontrado:', docSnap.data());
+    } else {
+      console.warn('El documento no existe');
+    }
+  } catch (error) {
+    console.error('Error al conectar con Firestore:', error);
+  }
+};
+
+// Ejecutar la verificación de conexión
+if (typeof window !== 'undefined') {
+  checkFirestoreConnection();
+}
 
 // Configurar persistencia para minimizar problemas con cookies de terceros
 if (typeof window !== 'undefined' && window.firebaseAuthOptions) {

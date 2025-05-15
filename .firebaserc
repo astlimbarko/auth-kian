@@ -1,5 +1,12 @@
 {
   "projects": {
-    "default": "admin-kian"
+    "default": "envios-kian"
+  },
+  "targets": {
+    "envios-kian": {
+      "hosting": {
+        "login-kian": ["login-kian"]
+      }
+    }
   }
-} 
+}

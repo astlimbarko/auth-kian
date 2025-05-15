@@ -81,6 +81,7 @@
           </button>
 
           <!-- Enlace para volver -->
+           <!-- 
           <div class="back-link">
             <router-link to="/">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -89,6 +90,8 @@
               <span>Tillbaka till kalkylatorn</span>
             </router-link>
           </div>
+          -->
+
         </form>
       </transition>
     </div>

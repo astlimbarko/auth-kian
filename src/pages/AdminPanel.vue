@@ -13,7 +13,12 @@
       <!-- Indicador de carga mientras se obtienen los precios -->
       <div v-if="cargando" class="loading-overlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Cargando precios...</div>
+        <div class="loading-text">Cargando configuración de precios...</div>
+      </div>
+
+      <div v-else-if="!precioEstandarActual || !precioEspecialActual" class="error-overlay">
+        <div class="error-icon">⚠️</div>
+        <div class="error-message">No se pudieron cargar los precios. Por favor, verifica tu conexión y recarga la página.</div>
       </div>
 
       <!-- Tarjeta principal (visible solo cuando los precios están cargados) -->
@@ -94,13 +99,22 @@ onMounted(async () => {
   if (!estaAutenticado) {
     // Redirigir al login si no está autenticado
     router.push('/admin/login');
-  } else {
+    return;
+  }
+  
+  try {
     // Cargar precios actuales desde Firebase
     await cargarPrecios();
     
     // Agregar escuchadores de eventos
     window.addEventListener('precios-actualizados', manejarPreciosActualizados);
     window.addEventListener('precios-error', manejarPreciosError);
+    
+    // Escuchar cambios en tiempo real
+    iniciarEscuchaRealtime();
+  } catch (error) {
+    console.error('Error crítico al cargar el panel de administración:', error);
+    mostrarError('No se pudo cargar la configuración de precios. Por favor, recarga la página.');
   }
 });
 
@@ -114,20 +128,35 @@ onUnmounted(() => {
 const cargarPrecios = async () => {
   try {
     cargando.value = true;
+    console.log('Cargando precios desde Firebase...');
+    
     const preciosActuales = await obtenerPrecios();
     console.log('AdminPanel: Precios cargados desde Firebase:', preciosActuales);
     
-    if (preciosActuales) {
-      PRECIO_ESTANDAR.value = preciosActuales.precioEstandar;
-      PRECIO_ESPECIAL.value = preciosActuales.precioEspecial;
-      
-      console.log('AdminPanel: Precios actualizados:');
-      console.log('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
-      console.log('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
+    if (!preciosActuales) {
+      throw new Error('No se recibieron datos de precios');
     }
+    
+    // Validar que los precios sean números válidos
+    if (typeof preciosActuales.precioEstandar !== 'number' || isNaN(preciosActuales.precioEstandar) ||
+        typeof preciosActuales.precioEspecial !== 'number' || isNaN(preciosActuales.precioEspecial)) {
+      throw new Error('Los precios en la base de datos no son válidos');
+    }
+    
+    // Actualizar valores
+    PRECIO_ESTANDAR.value = preciosActuales.precioEstandar;
+    PRECIO_ESPECIAL.value = preciosActuales.precioEspecial;
+    
+    console.log('AdminPanel: Precios actualizados:');
+    console.log('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
+    console.log('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
+    
   } catch (error) {
-    mostrarError('Error al cargar los precios: ' + error.message);
-    console.error('Error al cargar precios:', error);
+    const mensajeError = `Error al cargar los precios: ${error.message || 'Error desconocido'}`;
+    console.error(mensajeError, error);
+    mostrarError(mensajeError);
+    // Propagar el error para que pueda ser manejado por el componente padre si es necesario
+    throw error;
   } finally {
     cargando.value = false;
   }
@@ -321,6 +350,36 @@ const precioEspecialActual = computed(() => {
 .loading-text {
   font-size: 1rem;
   color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Estilos para el mensaje de error */
+.error-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff8f8;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+  width: 95%;
+  max-width: 550px;
+  border: 1px solid #ffcdd2;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #d32f2f;
+}
+
+.error-message {
+  font-size: 1rem;
+  color: #d32f2f;
+  line-height: 1.5;
 }
 
 @keyframes spin {
