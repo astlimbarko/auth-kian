@@ -10,8 +10,9 @@
           </svg>
         </div>
         <div>
-          <h1>Administrativ Panel</h1>
-          <p>Envios Kian</p>
+          <h1>Administrativ Panel 2.0</h1>
+         <!-- <p>Envios Kian</p> -->
+          <span class="user-email">{{ userEmail }}</span>
         </div>
       </div>
       
@@ -30,10 +31,20 @@
 </template>
 
 <script setup>
-import { defineEmits } from 'vue';
+import { defineEmits, ref, onMounted } from 'vue';
+import { obtenerUsuarioActual } from '../../services/authService';
 
 // Definir los eventos que emite este componente
 const emit = defineEmits(['cerrar-sesion']);
+
+const userEmail = ref('');
+
+onMounted(async () => {
+  const user = obtenerUsuarioActual();
+  if (user) {
+    userEmail.value = user.email;
+  }
+});
 
 /**
  * Maneja el evento de cerrar sesión
@@ -159,5 +170,17 @@ const cerrarSesion = () => {
     width: 1.1rem;
     height: 1.1rem;
   }
+}
+
+.logo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.user-email {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
 }
 </style> 

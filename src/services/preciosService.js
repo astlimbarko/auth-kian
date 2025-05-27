@@ -1,4 +1,5 @@
 import { db, doc, getDoc, setDoc, onSnapshot } from '../firebase';
+import { arrayUnion, updateDoc } from 'firebase/firestore';
 import logger from '../utils/logger';
 
 // No usamos valores por defecto, forzamos a que se obtengan de Firestore
@@ -66,37 +67,63 @@ export const obtenerPrecios = async () => {
 };
 
 // Guardar precios en Firestore
-export const guardarPrecios = async (estandar, especial) => {
+export const guardarPrecios = async (estandar, especial, usuario) => {
   try {
-    logger.debug('preciosService: Iniciando guardarPrecios con valores:', estandar, especial);
-    const docRef = doc(db, 'configuracion', 'precios');
-    logger.debug('preciosService: Referencia al documento creada');
+    logger.debug('preciosService: Iniciando guardarPrecios');
+    logger.debug('Usuario que realiza el cambio:', usuario);
     
-    // Creamos el objeto de datos
-    const data = {
+    // Obtener la fecha actual en la zona horaria de Bolivia (UTC-4)
+    const fechaBolivia = new Date().toLocaleString('es-BO', { timeZone: 'America/La_Paz' });
+    
+    // Obtener el documento actual para mantener la estructura existente
+    const docRef = doc(db, 'configuracion', 'precios');
+    const docSnap = await getDoc(docRef);
+    
+    // Validar que el usuario no sea undefined o null
+    const usuarioValido = usuario && usuario !== 'undefined' && usuario !== 'null' ? usuario : 'Usuario no identificado';
+    
+    // Preparar los datos a actualizar
+    const datosActualizados = {
       precioEstandar: estandar,
       precioEspecial: especial,
-      umbralEspecial: DEFAULTS.umbralEspecial,
-      ultimaActualizacion: new Date().toISOString()
+      ultimaActualizacion: fechaBolivia,
+      usuario: usuarioValido
     };
-    logger.debug('preciosService: Datos a guardar:', data);
     
-    // Actualizar documento con nuevos precios
-    logger.debug('preciosService: Intentando setDoc...');
-    await setDoc(docRef, data);
-    logger.debug('preciosService: setDoc completado exitosamente');
+    // Manejar el historial
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const historialActual = data.historial || [];
+      
+      // Agregar el nuevo cambio al historial
+      const nuevoCambio = {
+        precioEstandar: estandar,
+        precioEspecial: especial,
+        fecha: fechaBolivia,
+        usuario: usuarioValido
+      };
+      
+      // Mantener solo los últimos 10 cambios
+      const historialActualizado = [nuevoCambio, ...historialActual].slice(0, 10);
+      datosActualizados.historial = historialActualizado;
+    } else {
+      // Si es el primer cambio, crear el historial
+      datosActualizados.historial = [{
+        precioEstandar: estandar,
+        precioEspecial: especial,
+        fecha: fechaBolivia,
+        usuario: usuarioValido
+      }];
+    }
     
-    return { 
-      success: true,
-      mensaje: 'Precios actualizados correctamente'
-    };
+    // Guardar los datos actualizados
+    await setDoc(docRef, datosActualizados, { merge: true });
+    
+    logger.debug('preciosService: Precios guardados exitosamente');
+    return { success: true };
   } catch (error) {
-    logger.error("Error detallado al guardar precios:", error);
-    logger.error("Tipo de error:", error.name);
-    logger.error("Mensaje de error:", error.message);
-    logger.error("Código de error:", error.code);
-    logger.error("Stack trace:", error.stack);
-    throw new Error('Error al guardar precios: ' + error.message);
+    logger.error('preciosService: Error al guardar precios:', error);
+    throw error;
   }
 };
 

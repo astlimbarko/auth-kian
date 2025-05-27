@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-box">
       <h1 class="header">ENVIOS KIAN</h1>
-      <p class="subheader">ADMINISTRATIV PANEL</p>
+      <p class="subheader">ADMINISTRATIV PANEL 2.0</p>
 
       <transition name="fade">
         <form @submit.prevent="iniciarSesion" class="login-form">
@@ -106,7 +106,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { iniciarSesionConEmailYPassword } from '../services/authService';
+import { iniciarSesionConEmailYPassword, verificarAutenticacion, observarCambiosDeAutenticacion } from '../services/authService';
 
 // Cargar la fuente de manera programática para evitar problemas CORS
 onMounted(() => {
@@ -149,28 +149,81 @@ onUnmounted(() => {
   document.documentElement.style.background = 'white';
 });
 
+const router = useRouter();
 const email = ref('');
 const password = ref('');
 const error = ref('');
 const cargando = ref(false);
 const mostrarPassword = ref(false);
 const rememberMe = ref(false);
-const router = useRouter();
+
+// Configurar escuchadores de eventos al montar
+let unsubscribe = null;
+
+onMounted(async () => {
+  try {
+    // Configurar observador de cambios de autenticación
+    unsubscribe = observarCambiosDeAutenticacion((user) => {
+      if (user) {
+        console.log('Usuario autenticado detectado, redirigiendo al panel...');
+        router.push('/admin/panel');
+      }
+    });
+
+    // Verificar si ya hay una sesión activa
+    const estaAutenticado = await verificarAutenticacion();
+    if (estaAutenticado) {
+      console.log('Usuario ya autenticado, redirigiendo al panel...');
+      router.push('/admin/panel');
+    }
+  } catch (error) {
+    console.error('Error al verificar autenticación:', error);
+  }
+});
+
+// Limpiar el observador al desmontar
+onUnmounted(() => {
+  if (unsubscribe) {
+    unsubscribe();
+  }
+});
 
 const iniciarSesion = async () => {
   error.value = '';
   cargando.value = true;
   
   try {
-    // Simulamos un retraso para dar sensación de procesamiento
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Validaciones básicas
+    if (!email.value.trim()) {
+      error.value = 'Ange en e-postadress.';
+      cargando.value = false;
+      return;
+    }
+    
+    if (!password.value.trim()) {
+      error.value = 'Ange ett lösenord.';
+      cargando.value = false;
+      return;
+    }
     
     // Verificar que el email tenga un formato válido
-    if (!email.value.includes('@')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.value)) {
       error.value = 'Ange en giltig e-postadress.';
       cargando.value = false;
       return;
     }
+    
+    // Verificar si ya hay una sesión activa
+    const estaAutenticado = await verificarAutenticacion();
+    if (estaAutenticado) {
+      console.log('Usuario ya autenticado, redirigiendo al panel...');
+      router.push('/admin/panel');
+      return;
+    }
+    
+    // Simulamos un retraso para dar sensación de procesamiento
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     console.log('Intentando autenticación con Firebase para:', email.value);
     // Intento de autenticación con Firebase usando el servicio
@@ -178,13 +231,7 @@ const iniciarSesion = async () => {
     
     if (resultado.success) {
       console.log('Usuario autenticado con Firebase:', resultado.user);
-      
-      // Guardar estado de autenticación
-      localStorage.setItem('adminAutenticado', 'true');
-      
-      // Redireccionar al panel
       router.push('/admin/panel');
-      return;
     } else {
       console.error('Error de Firebase:', resultado.error);
       // Traducir mensaje de error al sueco
@@ -235,9 +282,34 @@ const iniciarSesion = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa, #e9edf2);
+  position: relative; /* necesario para que el ::before se posicione bien */
+  z-index: 0;
+
+  background: linear-gradient(135deg, #242424, #161616); 
+  /* background: linear-gradient(135deg, #f0f0f0, #d9d9d9); */
   font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden; /* evita que el pseudo-elemento sobresalga */
 }
+
+.login-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+
+  background-image: url('/6106991.jpg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.3; /* 👈 nivel de fantasma */
+  filter: blur(1px); /* 👈 aquí el desenfoque */
+  z-index: -1; /* 👈 asegura que quede detrás del contenido */
+  pointer-events: none; /* por si acaso, para que no interfiera con clics */
+}
+
+
+
 
 :deep(body), :deep(html) {
   margin: 0;
@@ -433,7 +505,7 @@ input:focus {
 
 .footer {
   margin-top: 2rem;
-  color: var(--text-muted);
+  color: #f2f2f2;
   font-size: 0.75rem;
   text-align: center;
 }

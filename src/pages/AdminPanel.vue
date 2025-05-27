@@ -28,7 +28,7 @@
           :valor-estandar-inicial="precioEstandarStr"
           :valor-especial-inicial="precioEspecialStr"
           :esta-guardando="guardando"
-          @guardar="guardarPrecios"
+          @guardar="manejarGuardarPrecios"
         />
       </div>
       
@@ -44,11 +44,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { actualizarTasasCambio, PRECIO_ESTANDAR, PRECIO_ESPECIAL } from '../constants/precios.js';
-import { obtenerPrecios } from '../services/preciosService';
+import { PRECIO_ESTANDAR, PRECIO_ESPECIAL } from '../constants/precios.js';
+import { obtenerPrecios, guardarPrecios } from '../services/preciosService';
 import { setDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { cerrarSesion as logoutAuth } from '../services/authService';
+import { 
+  cerrarSesion as logoutAuth, 
+  verificarAutenticacion,
+  observarCambiosDeAutenticacion,
+  obtenerUsuarioActual 
+} from '../services/authService';
 
 // Importar componentes
 import CabeceraAdmin from '../components/admin/CabeceraAdmin.vue';
@@ -61,17 +66,16 @@ const router = useRouter();
 
 // Estado del formulario
 const precioEstandarStr = computed(() => {
-  // Solo devolver el valor si los precios ya están cargados
   return cargando.value ? '' : PRECIO_ESTANDAR.value.toString();
 });
 const precioEspecialStr = computed(() => {
-  // Solo devolver el valor si los precios ya están cargados
   return cargando.value ? '' : PRECIO_ESPECIAL.value.toString();
 });
 const guardando = ref(false);
 const cargando = ref(true);
 const errorCarga = ref(false);
 const mensajeError = ref('');
+const unsubscribe = ref(null);
 
 // Referencia a la notificación
 const notificacion = ref(null);
@@ -83,11 +87,32 @@ const mostrarError = (mensaje) => {
 };
 
 // Manejador del evento de precios actualizados
-const manejarPreciosActualizados = (evento) => {
-  console.log('Precios actualizados:', evento.detail);
-  // No mostrar notificación durante la carga inicial
-  if (!cargando.value) {
-    notificacion.value?.mostrarExito('Priserna har uppdaterats');
+const esPrimeraCarga = ref(true);
+
+const manejarPreciosActualizados = (resultado) => {
+  if (!resultado) return;
+  
+  console.log('Precios actualizados:', resultado);
+  
+  if (resultado.success) {
+    if (esPrimeraCarga.value) {
+      esPrimeraCarga.value = false;
+      return;
+    }
+    
+    if (resultado.tiempoReal) {
+      // Actualizar precios desde la actualización en tiempo real
+      if (resultado.precios) {
+        PRECIO_ESTANDAR.value = resultado.precios.precioEstandar;
+        PRECIO_ESPECIAL.value = resultado.precios.precioEspecial;
+      }
+    } else {
+      // Actualizar precios desde la carga inicial
+      if (resultado.precios) {
+        PRECIO_ESTANDAR.value = resultado.precios.precioEstandar;
+        PRECIO_ESPECIAL.value = resultado.precios.precioEspecial;
+      }
+    }
   }
 };
 
@@ -99,38 +124,50 @@ const manejarPreciosError = (evento) => {
 
 // Configurar escuchadores de eventos al montar
 onMounted(async () => {
-  // Verificar si el usuario está autenticado
-  const estaAutenticado = localStorage.getItem('adminAutenticado') === 'true';
-  
-  if (!estaAutenticado) {
-    // Redirigir al login si no está autenticado
-    router.push('/admin/login');
-    return;
-  }
-  
-    try {
-      // Cargar precios actuales desde Firebase
-      await cargarPrecios();
-      
-      // Si llegamos aquí, la carga fue exitosa
-      errorCarga.value = false;
-      
-      // Agregar escuchadores de eventos
-      window.addEventListener('precios-actualizados', manejarPreciosActualizados);
-      window.addEventListener('precios-error', manejarPreciosError);
-      
-      // Escuchar cambios en tiempo real
-      iniciarEscuchaRealtime();
-    } catch (error) {
-      console.error('Error crítico al cargar el panel de administración:', error);
-      errorCarga.value = true;
-      mensajeError.value = error.message || 'No se pudo cargar la configuración de precios. Por favor, recarga la página.';
-      mostrarError(mensajeError.value);
+  try {
+    // Verificar autenticación real con Firebase
+    const estaAutenticado = await verificarAutenticacion();
+    
+    if (!estaAutenticado) {
+      console.log('Usuario no autenticado, redirigiendo al login...');
+      router.push('/admin/login');
+      return;
     }
+    
+    // Configurar observador de cambios de autenticación
+    unsubscribe.value = observarCambiosDeAutenticacion((user) => {
+      if (!user) {
+        console.log('Sesión cerrada, redirigiendo al login...');
+        router.push('/admin/login');
+      }
+    });
+    
+    // Cargar precios actuales desde Firebase
+    await cargarPrecios();
+    
+    // Si llegamos aquí, la carga fue exitosa
+    errorCarga.value = false;
+    
+    // Agregar escuchadores de eventos
+    window.addEventListener('precios-actualizados', manejarPreciosActualizados);
+    window.addEventListener('precios-error', manejarPreciosError);
+    
+    // Escuchar cambios en tiempo real
+    iniciarEscuchaRealtime();
+    
+  } catch (error) {
+    console.error('Error crítico al cargar el panel de administración:', error);
+    errorCarga.value = true;
+    mensajeError.value = error.message || 'No se pudo cargar la configuración de precios. Por favor, recarga la página.';
+    mostrarError(mensajeError.value);
+  }
 });
 
-// Limpiar escuchadores al desmontar
+// Limpiar recursos al desmontar
 onUnmounted(() => {
+  if (unsubscribe.value) {
+    unsubscribe.value();
+  }
   window.removeEventListener('precios-actualizados', manejarPreciosActualizados);
   window.removeEventListener('precios-error', manejarPreciosError);
 });
@@ -140,9 +177,6 @@ const iniciarEscuchaRealtime = () => {
   try {
     console.log('Iniciando escucha en tiempo real de precios...');
     const docRef = doc(db, 'configuracion', 'precios');
-    
-    // Bandera para ignorar la primera carga
-    let esPrimeraCarga = true;
     
     // Escuchar cambios en el documento
     return onSnapshot(docRef, (docSnap) => {
@@ -162,19 +196,14 @@ const iniciarEscuchaRealtime = () => {
         console.log('PRECIO_ESTANDAR:', PRECIO_ESTANDAR.value);
         console.log('PRECIO_ESPECIAL:', PRECIO_ESPECIAL.value);
         
-        // No disparar evento en la primera carga
-        if (!esPrimeraCarga) {
-          // Disparar evento personalizado para notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('precios-actualizados', {
-            detail: {
-              precioEstandar: PRECIO_ESTANDAR.value,
-              precioEspecial: PRECIO_ESPECIAL.value
-            }
-          }));
-        }
-        
-        // Marcar que ya pasó la primera carga
-        esPrimeraCarga = false;
+        // Disparar evento personalizado para notificar a otros componentes
+        window.dispatchEvent(new CustomEvent('precios-actualizados', {
+          detail: {
+            precioEstandar: PRECIO_ESTANDAR.value,
+            precioEspecial: PRECIO_ESPECIAL.value,
+            timestamp: new Date().getTime() // Agregar timestamp para evitar duplicados
+          }
+        }));
       }
     }, (error) => {
       console.error('Error en la escucha en tiempo real:', error);
@@ -228,7 +257,7 @@ const cargarPrecios = async () => {
 };
 
 // Guardar precios
-const guardarPrecios = async (datos) => {
+const manejarGuardarPrecios = async (datos) => {
   guardando.value = true;
   
   try {
@@ -239,9 +268,18 @@ const guardarPrecios = async (datos) => {
     
     console.log('Valores a guardar:', datos.estandar, datos.especial);
     
+    // Obtener el usuario actual de Firebase Auth
+    const user = obtenerUsuarioActual();
+    if (!user) {
+      throw new Error('No se pudo obtener el usuario actual');
+    }
+    
+    const usuario = user.email;
+    console.log('Usuario actual:', usuario);
+    
     // Actualizamos los valores en Firebase
     try {
-      await actualizarTasasCambio(datos.estandar, datos.especial);
+      await guardarPrecios(datos.estandar, datos.especial, usuario);
       console.log('Precios guardados exitosamente en Firebase');
       notificacion.value?.mostrarExito('Priserna har uppdaterats');
     } catch (firebaseError) {
@@ -251,7 +289,7 @@ const guardarPrecios = async (datos) => {
     }
   } catch (error) {
     console.error('Error al guardar precios:', error);
-    notificacion.value?.mostrarError(`Fel vid uppdatering av priser: ${error.message}`);
+    notificacion.value?.mostrarError(`Error: ${error.message}`);
   } finally {
     guardando.value = false;
   }
