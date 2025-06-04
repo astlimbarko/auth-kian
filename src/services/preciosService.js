@@ -2,11 +2,40 @@ import { db, doc, getDoc, setDoc, onSnapshot } from '../firebase';
 import { arrayUnion, updateDoc } from 'firebase/firestore';
 import logger from '../utils/logger';
 
-// No usamos valores por defecto, forzamos a que se obtengan de Firestore
+// Valores por defecto para cuando no hay datos en Firestore
 const DEFAULTS = {
-  precioEstandar: null,
-  precioEspecial: null,
-  umbralEspecial: 5000
+  precioEstandar: 0,
+  precioEspecial: 0,
+  umbralEspecial: 5000,
+  ultimaActualizacion: new Date().toLocaleString('es-BO', { timeZone: 'America/La_Paz' }),
+  usuario: 'sistema',
+  historial: [{
+    precioEstandar: 0,
+    precioEspecial: 0,
+    fecha: new Date().toLocaleString('es-BO', { timeZone: 'America/La_Paz' }),
+    usuario: 'sistema'
+  }]
+};
+
+// Función para inicializar los precios si no existen
+export const inicializarPrecios = async () => {
+  try {
+    logger.debug('Inicializando precios en Firestore...');
+    const docRef = doc(db, 'configuracion', 'precios');
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) {
+      logger.debug('No se encontró el documento de precios, creando con valores por defecto...');
+      await setDoc(docRef, DEFAULTS);
+      logger.debug('Documento de precios creado exitosamente');
+      return DEFAULTS;
+    }
+    
+    return docSnap.data();
+  } catch (error) {
+    logger.error('Error al inicializar precios:', error);
+    throw error;
+  }
 };
 
 // Obtener precios desde Firestore
@@ -29,40 +58,20 @@ export const obtenerPrecios = async () => {
       // Verificar que los datos tengan la estructura esperada
       if (!data.precioEstandar || !data.precioEspecial) {
         logger.error('Los datos obtenidos no tienen la estructura esperada:', data);
-        throw new Error('La estructura de los datos en Firestore no es válida');
+        // En lugar de lanzar error, intentamos inicializar
+        return await inicializarPrecios();
       }
       
       return data;
     } else {
       logger.error("No se encontró el documento de precios en Firestore");
-      // Verificar si la colección existe
-      try {
-        const colRef = collection(db, 'configuracion');
-        const colSnapshot = await getDocs(colRef);
-        const docs = colSnapshot.docs.map(doc => doc.id);
-        logger.error('Documentos en la colección "configuracion":', docs);
-      } catch (colError) {
-        logger.error('Error al verificar la colección configuracion:', colError);
-      }
-      
-      throw new Error("No se encontró la configuración de precios en la base de datos");
+      // En lugar de lanzar error, intentamos inicializar
+      return await inicializarPrecios();
     }
   } catch (error) {
-    logger.error("Error al obtener precios:", error);
-    logger.error('Tipo de error:', error.name);
-    logger.error('Mensaje de error:', error.message);
-    
-    // Verificar si es un error de permisos
-    if (error.code === 'permission-denied') {
-      logger.error('Error de permisos: La aplicación no tiene permisos para acceder a Firestore');
-    }
-    
-    // Verificar si hay problemas de red
-    if (error.code === 'unavailable') {
-      logger.error('Error de red: No se pudo conectar a Firestore');
-    }
-    
-    throw error; // Propagar el error para manejarlo en el componente
+    logger.error('Error al obtener precios:', error);
+    // En caso de error, devolvemos los valores por defecto
+    return DEFAULTS;
   }
 };
 
